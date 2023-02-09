@@ -16,6 +16,7 @@
 #include "InputCommon/ControllerInterface/Xlib/XInput2.h"
 #endif
 #ifdef CIFACE_USE_OSX
+#include "InputCommon/ControllerInterface/GameController/GameController.h"
 #include "InputCommon/ControllerInterface/OSX/OSX.h"
 #include "InputCommon/ControllerInterface/Quartz/Quartz.h"
 #endif
@@ -61,7 +62,12 @@ void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 // nothing needed
 #endif
 #ifdef CIFACE_USE_OSX
-// nothing needed for OSX and Quartz
+  if (m_wsi.type == WindowSystemType::MacOS)
+  {
+    ciface::GameController::Init();
+    ciface::OSX::Init(wsi.render_window);
+  }
+// nothing needed for Quartz
 #endif
 #ifdef CIFACE_USE_SDL
   m_input_backends.emplace_back(ciface::SDL::CreateInputBackend(this));
@@ -178,6 +184,7 @@ void ControllerInterface::RefreshDevices(RefreshReason reason)
       std::lock_guard lk_pre_population(m_pre_population_mutex);
       ciface::OSX::Init();
     }
+    ciface::GameController::PopulateDevices();
     ciface::Quartz::PopulateDevices(m_wsi.render_window);
   }
 #endif
@@ -233,6 +240,7 @@ void ControllerInterface::Shutdown()
 // nothing needed
 #endif
 #ifdef CIFACE_USE_OSX
+  ciface::GameController::DeInit();
   ciface::OSX::DeInit();
   ciface::Quartz::DeInit();
 #endif
