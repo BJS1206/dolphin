@@ -489,7 +489,14 @@ bool PopulateConfig(GLContext* m_main_gl_context)
     else if (GLExtensions::Version() >= 430)
     {
       // TODO: We should really parse the GL_SHADING_LANGUAGE_VERSION token.
-      g_ogl_config.eSupportedGLSLVersion = Glsl430;
+      if (GLExtensions::Version() >= 450)
+      {
+        g_ogl_config.eSupportedGLSLVersion = Glsl450;
+      }
+      else
+      {
+        g_ogl_config.eSupportedGLSLVersion = Glsl430;
+      }
       g_ogl_config.bSupportsTextureStorage = true;
       g_ogl_config.bSupportsImageLoadStore = true;
       g_Config.backend_info.bSupportsSSAA = true;
@@ -521,6 +528,10 @@ bool PopulateConfig(GLContext* m_main_gl_context)
     glEnable(GL_PROGRAM_POINT_SIZE);
   }
 
+  // Supported by all GS-supporting ES and 4.3+
+  g_Config.backend_info.bSupportsGLLayerInFS = g_Config.backend_info.bSupportsGeometryShaders &&
+                                               g_ogl_config.eSupportedGLSLVersion >= Glsl430;
+
   g_Config.backend_info.bSupportsBBox = g_Config.backend_info.bSupportsFragmentStoresAndAtomics;
 
   // Either method can do early-z tests. See PixelShaderGen for details.
@@ -531,8 +542,23 @@ bool PopulateConfig(GLContext* m_main_gl_context)
   if (g_ogl_config.max_samples < 1 || !g_ogl_config.bSupportsMSAA)
     g_ogl_config.max_samples = 1;
 
-  g_ogl_config.bSupportsShaderThreadShuffleNV =
-      GLExtensions::Supports("GL_NV_shader_thread_shuffle");
+  const bool bSupportsIsHelperInvocation = g_ogl_config.bIsES ?
+                                               g_ogl_config.eSupportedGLSLVersion >= GlslEs320 :
+                                               g_ogl_config.eSupportedGLSLVersion >= Glsl450;
+  g_ogl_config.bSupportsKHRShaderSubgroup =
+      GLExtensions::Supports("GL_KHR_shader_subgroup") && bSupportsIsHelperInvocation;
+  if (g_ogl_config.bSupportsKHRShaderSubgroup)
+  {
+    // Check for the features: basic + arithmetic + ballot
+    GLint supported_features = 0;
+    glGetIntegerv(GL_SUBGROUP_SUPPORTED_FEATURES_KHR, &supported_features);
+    if (~supported_features &
+        (GL_SUBGROUP_FEATURE_BASIC_BIT_KHR | GL_SUBGROUP_FEATURE_ARITHMETIC_BIT_KHR |
+         GL_SUBGROUP_FEATURE_BALLOT_BIT_KHR))
+    {
+      g_ogl_config.bSupportsKHRShaderSubgroup = false;
+    }
+  }
 
   // We require texel buffers, image load store, and compute shaders to enable GPU texture decoding.
   // If the driver doesn't expose the extensions, but supports GL4.3/GLES3.1, it will still be

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -108,7 +109,6 @@ class FileInfo final
 public:
   explicit FileInfo(const std::string& path);
   explicit FileInfo(const char* path);
-  explicit FileInfo(int fd);
 
   // Returns true if the path exists
   bool Exists() const;
@@ -120,15 +120,8 @@ public:
   u64 GetSize() const;
 
 private:
-#ifdef ANDROID
-  void AndroidContentInit(const std::string& path);
-#endif
-
-#ifdef _WIN32
-  struct __stat64 m_stat;
-#else
-  struct stat m_stat;
-#endif
+  std::filesystem::file_status m_status;
+  std::uintmax_t m_size;
   bool m_exists;
 };
 
@@ -144,17 +137,16 @@ bool IsFile(const std::string& path);
 // Returns the size of a file (or returns 0 if the path isn't a file that exists)
 u64 GetSize(const std::string& path);
 
-// Overloaded GetSize, accepts file descriptor
-u64 GetSize(const int fd);
-
 // Overloaded GetSize, accepts FILE*
 u64 GetSize(FILE* f);
 
 // Returns true if successful, or path already exists.
 bool CreateDir(const std::string& filename);
 
-// Creates the full path of fullPath returns true on success
-bool CreateFullPath(const std::string& fullPath);
+// Creates the full path to the file given in fullPath.
+// That is, for path '/a/b/c.bin', creates folders '/a' and '/a/b'.
+// Returns true if creation is successful or if the path already exists.
+bool CreateFullPath(std::string_view fullPath);
 
 enum class IfAbsentBehavior
 {
